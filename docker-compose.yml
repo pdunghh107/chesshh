@@ -1,0 +1,397 @@
+x-spring-env: &spring-env
+  SPRING_PROFILES_ACTIVE: postgres
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://pgbouncer:6432/${POSTGRES_DB:-zcomini}?prepareThreshold=0&preparedStatementCacheQueries=0&preparedStatementCacheSizeMiB=0"
+  SPRING_DATASOURCE_USERNAME: "${POSTGRES_USER:-zcomini}"
+  SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:-zcomini}"
+  SPRING_FLYWAY_URL: "jdbc:postgresql://postgres:5432/${POSTGRES_DB:-zcomini}"
+  SPRING_FLYWAY_USER: "${POSTGRES_USER:-zcomini}"
+  SPRING_FLYWAY_PASSWORD: "${POSTGRES_PASSWORD:-zcomini}"
+  SPRING_DATASOURCE_HIKARI_MAXIMUMPOOLSIZE: "4"
+  SPRING_DATASOURCE_HIKARI_MINIMUMIDLE: "1"
+  SPRING_DATASOURCE_HIKARI_IDLETIMEOUT: "600000"
+  SPRING_DATASOURCE_HIKARI_MAXLIFETIME: "1800000"
+  SPRING_DATASOURCE_HIKARI_CONNECTIONTIMEOUT: "30000"
+
+x-spring-service: &spring-service
+  restart: unless-stopped
+  depends_on:
+    postgres:
+      condition: service_healthy
+    pgbouncer:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: zcomini-postgres
+    restart: unless-stopped
+    command: postgres -c max_connections=${POSTGRES_MAX_CONNECTIONS:-200}
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:-zcomini}"
+      POSTGRES_USER: "${POSTGRES_USER:-zcomini}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-zcomini}"
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - zcomini-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-zcomini} -d ${POSTGRES_DB:-zcomini}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: zcomini-pgbouncer
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: "postgres"
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: "${POSTGRES_DB:-zcomini}"
+      POSTGRES_USER: "${POSTGRES_USER:-zcomini}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-zcomini}"
+      PGBOUNCER_PORT: "6432"
+      PGBOUNCER_POOL_MODE: "${PGBOUNCER_POOL_MODE:-transaction}"
+      PGBOUNCER_MAX_CLIENT_CONN: "${PGBOUNCER_MAX_CLIENT_CONN:-300}"
+      PGBOUNCER_DEFAULT_POOL_SIZE: "${PGBOUNCER_DEFAULT_POOL_SIZE:-32}"
+      PGBOUNCER_MIN_POOL_SIZE: "${PGBOUNCER_MIN_POOL_SIZE:-8}"
+      PGBOUNCER_RESERVE_POOL_SIZE: "${PGBOUNCER_RESERVE_POOL_SIZE:-8}"
+      PGBOUNCER_MAX_DB_CONNECTIONS: "${PGBOUNCER_MAX_DB_CONNECTIONS:-48}"
+      PGBOUNCER_SERVER_IDLE_TIMEOUT: "${PGBOUNCER_SERVER_IDLE_TIMEOUT:-30}"
+    entrypoint:
+      - /bin/sh
+      - /usr/local/bin/pgbouncer-entrypoint.sh
+    volumes:
+      - ./infra/pgbouncer/entrypoint.sh:/usr/local/bin/pgbouncer-entrypoint.sh:ro
+    ports:
+      - "${PGBOUNCER_PORT:-6432}:6432"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "PGPASSWORD=$$POSTGRES_PASSWORD psql -h 127.0.0.1 -p 6432 -U $$POSTGRES_USER -d $$POSTGRES_DB -c 'SELECT 1;' >/dev/null",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  redis:
+    image: redis:7-alpine
+    container_name: zcomini-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: zcomini-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: "${RABBITMQ_USER:-zcomini}"
+      RABBITMQ_DEFAULT_PASS: "${RABBITMQ_PASSWORD:-zcomini}"
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  minio:
+    image: minio/minio:RELEASE.2025-01-20T14-49-07Z
+    container_name: zcomini-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: "${MINIO_ROOT_USER:-minio}"
+      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD:-minio123}"
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - zcomini-minio:/data
+
+  auth-service:
+    <<: *spring-service
+    container_name: zcomini-auth-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      redis:
+        condition: service_started
+    build:
+      context: .
+      dockerfile: auth-service/Dockerfile
+    environment:
+      <<: *spring-env
+      APP_AUTH_JWT_SECRET: "${JWT_SECRET:-12345678901234567890123456789012}"
+      APP_AUTH_ACCESS_TOKEN_MINUTES: "${JWT_ACCESS_TOKEN_MINUTES:-15}"
+      APP_AUTH_REFRESH_TOKEN_DAYS: "${JWT_REFRESH_TOKEN_DAYS:-7}"
+      APP_AUTH_EXPOSE_DEV_SECRETS: "false"
+      SEED_USER_EMAIL: "${SEED_USER_EMAIL:-superadmin@zcomini.local}"
+      SEED_USER_PASSWORD: "${SEED_USER_PASSWORD:-ChangeMe123!}"
+      INTERNAL_SERVICE_KEY: "${INTERNAL_SERVICE_KEY:-dev-internal-key}"
+      APP_AUTH_GOOGLE_CLIENT_IDS: "${GOOGLE_CLIENT_IDS:-}"
+      APP_AUTH_GOOGLE_TOKEN_INFO_URL: "${GOOGLE_TOKEN_INFO_URL:-https://oauth2.googleapis.com/tokeninfo}"
+      APP_AUTH_ZALO_APP_ID: "${ZALO_APP_ID:-}"
+      APP_AUTH_ZALO_APP_SECRET: "${ZALO_APP_SECRET:-}"
+      APP_AUTH_ZALO_TOKEN_URL: "${ZALO_TOKEN_URL:-https://oauth.zaloapp.com/v4/access_token}"
+      APP_AUTH_ZALO_PROFILE_URL: "${ZALO_PROFILE_URL:-https://graph.zalo.me/v2.0/me}"
+      APP_AUTH_ZALO_PHONE_URL: "${ZALO_PHONE_URL:-https://graph.zalo.me/v2.0/me/info}"
+      RABBITMQ_HOST: "rabbitmq"
+      RABBITMQ_PORT: "${RABBITMQ_PORT:-5672}"
+      RABBITMQ_USER: "${RABBITMQ_USER:-zcomini}"
+      RABBITMQ_PASSWORD: "${RABBITMQ_PASSWORD:-zcomini}"
+      NOTIFICATION_EXCHANGE: "${NOTIFICATION_EXCHANGE:-notification.events}"
+      NOTIFICATION_OTP_ROUTING_KEY: "${NOTIFICATION_OTP_ROUTING_KEY:-notification.otp.send}"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+    ports:
+      - "8081:8081"
+
+  tenant-service:
+    <<: *spring-service
+    container_name: zcomini-tenant-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    build:
+      context: .
+      dockerfile: tenant-service/Dockerfile
+    environment:
+      <<: *spring-env
+      APP_AUTH_JWT_SECRET: "${JWT_SECRET:-12345678901234567890123456789012}"
+      AUTH_SERVICE_BASE_URL: "http://auth-service:8081"
+      INTERNAL_SERVICE_KEY: "${INTERNAL_SERVICE_KEY:-dev-internal-key}"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+    ports:
+      - "8082:8082"
+
+  product-service:
+    <<: *spring-service
+    container_name: zcomini-product-service
+    build:
+      context: .
+      dockerfile: product-service/Dockerfile
+    environment:
+      <<: *spring-env
+      APP_AUTH_JWT_SECRET: "${JWT_SECRET:-12345678901234567890123456789012}"
+    ports:
+      - "8083:8083"
+
+  inventory-service:
+    <<: *spring-service
+    container_name: zcomini-inventory-service
+    build:
+      context: .
+      dockerfile: inventory-service/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      redis:
+        condition: service_started
+    environment:
+      <<: *spring-env
+      APP_AUTH_JWT_SECRET: "${JWT_SECRET:-12345678901234567890123456789012}"
+      TENANT_SERVICE_BASE_URL: "http://tenant-service:8082"
+      INTERNAL_SERVICE_KEY: "${INTERNAL_SERVICE_KEY:-dev-internal-key}"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+    ports:
+      - "8084:8084"
+
+  order-service:
+    <<: *spring-service
+    container_name: zcomini-order-service
+    build:
+      context: .
+      dockerfile: order-service/Dockerfile
+    environment:
+      <<: *spring-env
+      APP_AUTH_JWT_SECRET: "${JWT_SECRET:-12345678901234567890123456789012}"
+      AUTH_SERVICE_BASE_URL: "http://auth-service:8081"
+      INTERNAL_SERVICE_KEY: "${INTERNAL_SERVICE_KEY:-dev-internal-key}"
+    ports:
+      - "8085:8085"
+
+  service-catalog-service:
+    <<: *spring-service
+    container_name: zcomini-service-catalog-service
+    build:
+      context: .
+      dockerfile: service-catalog-service/Dockerfile
+    environment:
+      <<: *spring-env
+      APP_AUTH_JWT_SECRET: "${JWT_SECRET:-12345678901234567890123456789012}"
+    ports:
+      - "8093:8093"
+
+  booking-service:
+    <<: *spring-service
+    container_name: zcomini-booking-service
+    build:
+      context: .
+      dockerfile: booking-service/Dockerfile
+    environment:
+      <<: *spring-env
+      APP_AUTH_JWT_SECRET: "${JWT_SECRET:-12345678901234567890123456789012}"
+    ports:
+      - "8094:8094"
+
+  resource-service:
+    <<: *spring-service
+    container_name: zcomini-resource-service
+    build:
+      context: .
+      dockerfile: resource-service/Dockerfile
+    environment:
+      <<: *spring-env
+      APP_AUTH_JWT_SECRET: "${JWT_SECRET:-12345678901234567890123456789012}"
+    ports:
+      - "8095:8095"
+
+  schedule-service:
+    <<: *spring-service
+    container_name: zcomini-schedule-service
+    build:
+      context: .
+      dockerfile: schedule-service/Dockerfile
+    environment:
+      <<: *spring-env
+      APP_AUTH_JWT_SECRET: "${JWT_SECRET:-12345678901234567890123456789012}"
+    ports:
+      - "8096:8096"
+
+  einvoice-service:
+    <<: *spring-service
+    container_name: zcomini-einvoice-service
+    build:
+      context: .
+      dockerfile: einvoice-service/Dockerfile
+    environment:
+      <<: *spring-env
+      APP_AUTH_JWT_SECRET: "${JWT_SECRET:-12345678901234567890123456789012}"
+    ports:
+      - "8086:8086"
+
+  affiliate-service:
+    <<: *spring-service
+    container_name: zcomini-affiliate-service
+    build:
+      context: .
+      dockerfile: affiliate-service/Dockerfile
+    environment:
+      <<: *spring-env
+      APP_AUTH_JWT_SECRET: "${JWT_SECRET:-12345678901234567890123456789012}"
+    ports:
+      - "8087:8087"
+
+  notification-service:
+    <<: *spring-service
+    container_name: zcomini-notification-service
+    build:
+      context: .
+      dockerfile: notification-service/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      <<: *spring-env
+      APP_AUTH_JWT_SECRET: "${JWT_SECRET:-12345678901234567890123456789012}"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      RABBITMQ_HOST: "rabbitmq"
+      RABBITMQ_PORT: "${RABBITMQ_PORT:-5672}"
+      RABBITMQ_USER: "${RABBITMQ_USER:-zcomini}"
+      RABBITMQ_PASSWORD: "${RABBITMQ_PASSWORD:-zcomini}"
+      NOTIFICATION_EXCHANGE: "${NOTIFICATION_EXCHANGE:-notification.events}"
+      NOTIFICATION_OTP_QUEUE: "${NOTIFICATION_OTP_QUEUE:-notification.otp.send}"
+      NOTIFICATION_OTP_ROUTING_KEY: "${NOTIFICATION_OTP_ROUTING_KEY:-notification.otp.send}"
+      SMS_PROVIDER_ENABLED: "${SMS_PROVIDER_ENABLED:-false}"
+      SMS_PROVIDER_BASE_URL: "${SMS_PROVIDER_BASE_URL:-}"
+      SMS_PROVIDER_SEND_PATH: "${SMS_PROVIDER_SEND_PATH:-}"
+      SMS_PROVIDER_AUTH_HEADER: "${SMS_PROVIDER_AUTH_HEADER:-Authorization}"
+      SMS_PROVIDER_AUTH_VALUE: "${SMS_PROVIDER_AUTH_VALUE:-}"
+      SMS_PROVIDER_TIMEOUT_MS: "${SMS_PROVIDER_TIMEOUT_MS:-5000}"
+      ZALO_ZBS_ENABLED: "${ZALO_ZBS_ENABLED:-false}"
+      ZALO_ZBS_SEND_URL: "${ZALO_ZBS_SEND_URL:-https://business.openapi.zalo.me/message/template}"
+      ZALO_ZBS_ACCESS_TOKEN: "${ZALO_ZBS_ACCESS_TOKEN:-}"
+      ZALO_ZBS_REFRESH_TOKEN: "${ZALO_ZBS_REFRESH_TOKEN:-}"
+      ZALO_ZBS_APP_ID: "${ZALO_ZBS_APP_ID:-${ZALO_APP_ID:-}}"
+      ZALO_ZBS_APP_SECRET: "${ZALO_ZBS_APP_SECRET:-${ZALO_APP_SECRET:-}}"
+      ZALO_ZBS_TOKEN_URL: "${ZALO_ZBS_TOKEN_URL:-https://oauth.zaloapp.com/v4/oa/access_token}"
+      ZALO_ZBS_OTP_TEMPLATE_ID: "${ZALO_ZBS_OTP_TEMPLATE_ID:-}"
+      ZALO_ZBS_SEND_MODE: "${ZALO_ZBS_SEND_MODE:-PHONE}"
+      ZALO_ZBS_TIMEOUT_MS: "${ZALO_ZBS_TIMEOUT_MS:-5000}"
+    ports:
+      - "8088:8088"
+
+  payment-service:
+    <<: *spring-service
+    container_name: zcomini-payment-service
+    build:
+      context: .
+      dockerfile: payment-service/Dockerfile
+    environment:
+      <<: *spring-env
+      APP_AUTH_JWT_SECRET: "${JWT_SECRET:-12345678901234567890123456789012}"
+      AUTH_SERVICE_BASE_URL: "http://auth-service:8081"
+      TENANT_SERVICE_BASE_URL: "http://tenant-service:8082"
+      INTERNAL_SERVICE_KEY: "${INTERNAL_SERVICE_KEY:-dev-internal-key}"
+      MOMO_BASE_URL: "${MOMO_BASE_URL:-https://test-payment.momo.vn}"
+      MOMO_PARTNER_CODE: "${MOMO_PARTNER_CODE:-}"
+      MOMO_ACCESS_KEY: "${MOMO_ACCESS_KEY:-}"
+      MOMO_SECRET_KEY: "${MOMO_SECRET_KEY:-}"
+      MOMO_PUBLIC_BASE_URL: "${MOMO_PUBLIC_BASE_URL:-http://localhost:8089}"
+      MOMO_IPN_PATH: "${MOMO_IPN_PATH:-/api/v1/payments/webhook/momo}"
+      MOMO_REDIRECT_URL: "${MOMO_REDIRECT_URL:-http://localhost:3000/payment/momo/return}"
+    ports:
+      - "${PAYMENT_SERVICE_PORT:-8089}:8089"
+
+  ai-service:
+    <<: *spring-service
+    container_name: zcomini-ai-service
+    build:
+      context: .
+      dockerfile: ai-service/Dockerfile
+    environment:
+      <<: *spring-env
+      APP_AUTH_JWT_SECRET: "${JWT_SECRET:-12345678901234567890123456789012}"
+      OPENROUTER_API_KEY: "${OPENROUTER_API_KEY:-}"
+      OPENROUTER_BASE_URL: "${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}"
+      OPENROUTER_APP_NAME: "${OPENROUTER_APP_NAME:-FizaHUB}"
+      OPENROUTER_REFERER: "${OPENROUTER_REFERER:-https://fizahub.vn}"
+      AI_GENERAL_MODEL: "${AI_GENERAL_MODEL:-google/gemini-2.5-flash-lite}"
+      AI_QR_INTENT_MODEL: "${AI_QR_INTENT_MODEL:-google/gemini-2.5-flash-lite}"
+      AI_OCR_MODEL: "${AI_OCR_MODEL:-baidu/qianfan-ocr-fast:free}"
+      AI_STT_ENABLED: "${AI_STT_ENABLED:-false}"
+      AI_STT_MODEL: "${AI_STT_MODEL:-openai/gpt-4o-mini-transcribe}"
+      AI_DAILY_TOKEN_LIMIT: "${AI_DAILY_TOKEN_LIMIT:-10000}"
+    ports:
+      - "${AI_SERVICE_PORT:-8090}:8090"
+
+volumes:
+  zcomini-postgres:
+  zcomini-minio:

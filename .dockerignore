@@ -1,0 +1,9 @@
+.git
+.idea
+.vscode
+.env
+.env.*
+*.log
+**/target
+postman
+infra
