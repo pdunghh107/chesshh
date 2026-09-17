@@ -4,6 +4,7 @@ import org.springframework.core.MethodParameter;
 import org.springframework.data.domain.Page;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageConverter;
+import org.springframework.http.converter.StringHttpMessageConverter;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
@@ -13,17 +14,26 @@ import org.springframework.lang.Nullable;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pdunghh.shared.api.ApiError;
 import com.pdunghh.shared.api.ApiResponse;
 import com.pdunghh.shared.api.PageResponse;
 
-@RestControllerAdvice
+import lombok.extern.slf4j.Slf4j;
+
+// restcontrolleradvice luon chay khi controller return
+@RestControllerAdvice(basePackages = "com.pdunghh")
+@Slf4j
 public class ApiEnvelopeResponseBodyAdvice implements ResponseBodyAdvice<Object> {
 
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
     @Override
-    public boolean supports(@NonNull MethodParameter returnType,
+    public boolean supports(
+            @NonNull MethodParameter returnType,
             @NonNull Class<? extends HttpMessageConverter<?>> converterType) {
-        return MappingJackson2HttpMessageConverter.class.isAssignableFrom(converterType);
+        return MappingJackson2HttpMessageConverter.class.isAssignableFrom(converterType)
+                || StringHttpMessageConverter.class.isAssignableFrom(converterType);
     }
 
     @Override
@@ -35,56 +45,87 @@ public class ApiEnvelopeResponseBodyAdvice implements ResponseBodyAdvice<Object>
             @NonNull ServerHttpRequest request,
             @NonNull ServerHttpResponse response) {
 
-        // 1. Check content type
         if (selectedContentType == null
                 || !MediaType.APPLICATION_JSON.isCompatibleWith(selectedContentType)) {
             return body;
         }
 
-        // 2. Get status
         int status = response instanceof ServletServerHttpResponse servletResponse
                 ? servletResponse.getServletResponse().getStatus()
                 : 200;
 
-        // 3. Case status >= 400
+        if (body == null) {
+            return buildApiResponseMethod(status, null);
+        }
 
         if (status >= 400) {
             return body;
         }
 
-        // 4. Wrap api response or api error
         if (body instanceof ApiResponse<?> || body instanceof ApiError) {
             return body;
         }
 
-        // 5. Case status == 204
         if (status == 204) {
             return null;
         }
 
-        // 6. Wrap page respose
+        ApiResponse<?> pageResponse = resolvePageResponse(body);
+        if (pageResponse != null) {
+            return pageResponse;
+        }
+
+        Object stringResponse = resolveStringResponse(status, body, selectedConverterType);
+        if (stringResponse != null) {
+            return stringResponse;
+        }
+
+        return buildApiResponseMethod(status, body);
+    }
+
+    // case page
+    private ApiResponse<?> resolvePageResponse(Object body) {
         if (body instanceof Page<?> page) {
             return ApiResponse.paged(PageResponse.from(page));
         }
-
         if (body instanceof PageResponse<?> pageResponse) {
             return ApiResponse.paged(pageResponse);
         }
+        return null;
+    }
 
-        // 7. Case body = null
-        if (body == null) {
-            return status == 201 ? ApiResponse.created() : ApiResponse.ok();
+    // case string
+    private Object resolveStringResponse(int status, Object body, Class<?> converterType) {
+        if (body instanceof String message) {
+            ApiResponse<?> response = buildApiResponseMethod(status, message);
+
+            return resolveJsonWrappedToString(response, converterType);
         }
 
-        // 8. Case status == 201
-        if (status == 201) {
-            return ApiResponse.created(body);
+        return null;
+    }
+
+    // case json wrapped to string
+    private Object resolveJsonWrappedToString(ApiResponse<?> response, Class<?> converterType) {
+        if (StringHttpMessageConverter.class.isAssignableFrom(converterType)) {
+            try {
+                return objectMapper.writeValueAsString(response);
+            } catch (Exception e) {
+                log.error("[API WRAPPER CASE STRING]: CONVERT STRING SANG API RESPONSE THAT BAI", e);
+                return response;
+            }
         }
 
-        // TODO: Co xu ly case message va case content type trong truong hop download
-        // khong ???
+        return response;
+    }
 
-        return ApiResponse.ok(body);
+    // resolve created of ok
+    private ApiResponse<?> buildApiResponseMethod(int status, Object body) {
+        return status == 201 ? ApiResponse.created(body) : ApiResponse.ok(body);
+    }
+
+    private ApiResponse<?> buildApiResponseMethod(int status, String message) {
+        return status == 201 ? ApiResponse.created(message) : ApiResponse.ok(message);
     }
 
 }
