@@ -1,3 +1,36 @@
 spring:
   application:
-    name: auth
+    name: auth-service
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:chesshh}
+    username: ${DB_USER:${POSTGRES_USER:postgres}}
+    password: ${DB_PASSWORD:${POSTGRES_PASSWORD:123456}}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: schema_auth
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    schemas: schema_auth
+    default-schema: schema_auth
+    locations: classpath:db/migration
+    create-schemas: true
+
+server:
+  port: 8081
+  address: 0.0.0.0
+
+app:
+  auth:
+    jwt-secret: ${JWT_SECRET:jwt_secret_for_auth_service_phai_dai_hon_32_ky_tu_nhe_123}
+    jwt-issuer: ${JWT_ISSUER:pdunghh107@gmail.com}
+    access-token-minutes: ${ACCESS_TOKEN_MINUTES:15}
+    refresh-token-days: ${REFRESH_TOKEN_DAYS:7}
