@@ -25,4 +25,6 @@ public class AuthConfig {
     public SecretKey secretKey(AuthProperties authProperties) {
         return Keys.hmacShaKeyFor(authProperties.jwtSecret().getBytes(StandardCharsets.UTF_8));
     }
+
+    // TODO : config cookie
 }
