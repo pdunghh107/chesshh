@@ -1,7 +1,5 @@
 package com.pdunghh.shared.web;
 
-import java.util.UUID;
-
 import org.springframework.core.MethodParameter;
 import org.springframework.data.domain.Page;
 import org.springframework.http.MediaType;
@@ -21,6 +19,7 @@ import com.pdunghh.shared.api.ApiError;
 import com.pdunghh.shared.api.ApiResponse;
 import com.pdunghh.shared.api.ApiSuccessCode;
 import com.pdunghh.shared.api.PageResponse;
+import com.pdunghh.shared.security.RequestContext;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -60,9 +59,7 @@ public class ApiWrapper implements ResponseBodyAdvice<Object> {
             return body;
         }
 
-        // TODO: Lấy traceId từ Header, MDC hoặc Context. Ở đây dùng random làm ví dụ
-        // tạm.
-        String traceId = UUID.randomUUID().toString();
+        String traceId = RequestContext.getTraceId();
 
         // 3. Xử lý phân trang
         if (body instanceof Page<?> page) {

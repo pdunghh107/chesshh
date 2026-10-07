@@ -4,9 +4,11 @@ import org.springframework.http.HttpStatus;
 
 public enum ApiErrorCode {
     BAD_REQUEST(HttpStatus.BAD_REQUEST, "BAD_REQUEST", "Yêu cầu không hợp lệ"),
+    FIELD_INVALID(HttpStatus.BAD_REQUEST, "FIELD_INVALID", "Dữ liệu không hợp lệ"),
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Chưa xác thực"),
     FORBIDDEN(HttpStatus.FORBIDDEN, "FORBIDDEN", "Không có quyền"),
     NOT_FOUND(HttpStatus.NOT_FOUND, "NOT_FOUND", "Không tìm thấy"),
+    CONFLICT(HttpStatus.CONFLICT, "CONFLICT", "Trùng lặp dữ liệu"),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "Lỗi hệ thống");
 
     private final HttpStatus status;
