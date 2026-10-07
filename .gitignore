@@ -4,6 +4,43 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
+### Java / Maven Build Artifacts ###
+*.class
+*.jar
+*.war
+*.ear
+hs_err_pid*
+
+### Spring Boot / Application ###
+application-local.properties
+application-local.yml
+application-dev.properties
+application-dev.yml
+application-prod.properties
+application-prod.yml
+
+### Environment & Secrets ###
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.jks
+secrets/
+
+### Logs ###
+*.log
+logs/
+log/
+
+### OS Files ###
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+### Docker ###
+docker-compose.override.yml
+
 ### STS ###
 .apt_generated
 .classpath

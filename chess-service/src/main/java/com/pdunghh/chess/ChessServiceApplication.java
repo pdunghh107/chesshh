@@ -1,4 +1,4 @@
-package com.pdunghh.auth;
+package com.pdunghh.chess;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

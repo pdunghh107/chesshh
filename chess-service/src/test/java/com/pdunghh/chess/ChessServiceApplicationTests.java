@@ -1,4 +1,4 @@
-package com.pdunghh.auth;
+package com.pdunghh.chess;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
