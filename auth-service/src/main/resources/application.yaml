@@ -1,3 +1,33 @@
+server:
+  port: 8081
+
 spring:
   application:
     name: auth-service
+  
+  datasource:
+    url: jdbc:postgresql://localhost:5432/chesshh_auth
+    username: postgres
+    password: password # Thay bằng password của bạn
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate # Sử dụng Flyway để quản lý schema, Hibernate chỉ validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    validate-on-migrate: true # Validate checksum của file sql
+    locations: classpath:db/migration
+
+app:
+  jwt:
+    secret: "change-this-secret-key-in-production-must-be-very-long"
+    expiration-ms: 3600000 # 1 hour
+    refresh-expiration-ms: 86400000 # 24 hours

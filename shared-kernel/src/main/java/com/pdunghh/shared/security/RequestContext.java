@@ -9,6 +9,7 @@ public final class RequestContext {
 
     private static final ThreadLocal<UUID> USER_ID = new ThreadLocal<>();
     private static final ThreadLocal<String> TRACE_ID = new ThreadLocal<>();
+    private static final ThreadLocal<String> JTI = new ThreadLocal<>();
 
     public static void setUserId(UUID userId) {
         USER_ID.set(userId);
@@ -26,8 +27,17 @@ public final class RequestContext {
         return TRACE_ID.get();
     }
 
+    public static void setJti(String jti) {
+        JTI.set(jti);
+    }
+
+    public static String getJti() {
+        return JTI.get();
+    }
+
     public static void clear() {
         USER_ID.remove();
         TRACE_ID.remove();
+        JTI.remove();
     }
 }
