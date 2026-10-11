@@ -24,7 +24,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-@Component
+@Component("jwtAuthFilter")
 @RequiredArgsConstructor
 @Slf4j
 public class RequestContextFilter extends OncePerRequestFilter {
@@ -62,7 +62,13 @@ public class RequestContextFilter extends OncePerRequestFilter {
                 if (claims != null && claims.getSubject() != null) {
                     // Check Redis for revoked token
                     if (isTokenRevoked(claims)) {
-                        throw new RuntimeException("Token has been revoked");
+                        String uri = request.getRequestURI();
+                        // TODO : cau hinh white list vao trong nay
+                        if (uri.endsWith("/logout") || uri.endsWith("/logout-all")) {
+                            log.debug("Token is revoked but allowing logout request to pass: {}", uri);
+                        } else {
+                            throw new RuntimeException("Token has been revoked");
+                        }
                     }
 
                     try {

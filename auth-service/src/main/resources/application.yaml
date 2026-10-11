@@ -4,30 +4,45 @@ server:
 spring:
   application:
     name: auth-service
-  
+
   datasource:
-    url: jdbc:postgresql://localhost:5432/chesshh_auth
+    url: jdbc:postgresql://localhost:5432/chesshh
     username: postgres
-    password: password # Thay bằng password của bạn
+    password: 123456
     driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
       ddl-auto: validate # Sử dụng Flyway để quản lý schema, Hibernate chỉ validate
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
+        default_schema: auth
 
   flyway:
     enabled: true
     baseline-on-migrate: true
     validate-on-migrate: true # Validate checksum của file sql
     locations: classpath:db/migration
+    default-schema: auth
+    create-schemas: true
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      # password: your_redis_password_if_any
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
 
 app:
   jwt:
-    secret: "change-this-secret-key-in-production-must-be-very-long"
-    expiration-ms: 3600000 # 1 hour
+    secret: 3eb08fe65bcca387a304ab725a3fe273641d98f39fda6b0dae2aaa53bf92d9ee
+    expiration-ms: 300000 # 5 minutes
     refresh-expiration-ms: 86400000 # 24 hours

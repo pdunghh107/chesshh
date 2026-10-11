@@ -86,7 +86,8 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public void logout(String refreshToken) {
+    @Transactional
+    public String logout(String refreshToken) {
         String jti = RequestContext.getJti();
         log.info("Logout for jti: {}", jti);
 
@@ -97,15 +98,19 @@ public class AuthServiceImpl implements AuthService {
         if (refreshToken != null && !refreshToken.isBlank()) {
             tokenService.revokeToken(refreshToken);
         }
+
+        return "Đăng xuất thành công";
     }
 
     @Override
-    public void logoutAll() {
+    @Transactional
+    public String logoutAll() {
         UUID userId = RequestContext.getUserId();
         log.info("Logout all for user: {}", userId);
         User user = findUserById(userId);
 
         logoutAllUserTokens(user);
+        return "Đăng xuất khỏi tất cả thiết bị thành công";
     }
 
     @Override

@@ -18,6 +18,7 @@ import com.pdunghh.auth.dto.request.RegisterRequest;
 import com.pdunghh.auth.dto.request.UpdateMeRequest;
 import com.pdunghh.auth.dto.response.LoginResponse;
 import com.pdunghh.auth.dto.response.UserResponse;
+import com.pdunghh.auth.exception.AuthException;
 import com.pdunghh.auth.service.AuthService;
 
 import jakarta.servlet.http.HttpServletResponse;
@@ -46,25 +47,27 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public void logout(@CookieValue(name = "refresh_token", required = false) String refreshToken, HttpServletResponse response) {
-        authService.logout(refreshToken);
+    public String logout(@CookieValue(name = "refresh_token", required = false) String refreshToken,
+            HttpServletResponse response) {
+        String message = authService.logout(refreshToken);
         clearRefreshTokenCookie(response);
+        return message;
     }
 
     @PostMapping("/logout-all")
-    public void logoutAll(HttpServletResponse response) {
-        authService.logoutAll();
+    public String logoutAll(HttpServletResponse response) {
+        String message = authService.logoutAll();
         clearRefreshTokenCookie(response);
+        return message;
     }
 
     @PostMapping("/refresh-token")
-    public LoginResponse refreshToken(@CookieValue(name = "refresh_token", required = false) String refreshToken, HttpServletResponse response) {
-        if (refreshToken == null || refreshToken.isBlank()) {
-            throw com.pdunghh.auth.exception.AuthException.invalidCredentials();
-        }
+    public LoginResponse refreshToken(@CookieValue(name = "refresh_token", required = false) String refreshToken,
+            HttpServletResponse response) {
+        checkRefreshToken(refreshToken);
         LoginResponse result = authService.refreshToken(refreshToken);
         setRefreshTokenCookie(response, result.refreshToken());
-        return result; // refreshToken hidden by @JsonIgnore
+        return result;
     }
 
     @GetMapping("/me")
@@ -78,8 +81,9 @@ public class AuthController {
     }
 
     @DeleteMapping("/me/deactivate")
-    public void deactivateAccount() {
+    public String deactivateAccount() {
         authService.deactivateAccount();
+        return "Vô hiệu hóa tài khoản thành công";
     }
 
     private void setRefreshTokenCookie(HttpServletResponse response, String refreshToken) {
@@ -101,5 +105,11 @@ public class AuthController {
                 .maxAge(0)
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+    }
+
+    private void checkRefreshToken(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw AuthException.invalidCredentials();
+        }
     }
 }

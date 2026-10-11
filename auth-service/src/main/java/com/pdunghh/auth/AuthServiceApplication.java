@@ -3,7 +3,7 @@ package com.pdunghh.auth;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
-@SpringBootApplication
+@SpringBootApplication(scanBasePackages = { "com.pdunghh.auth", "com.pdunghh.shared" })
 public class AuthServiceApplication {
 
 	public static void main(String[] args) {

@@ -15,9 +15,9 @@ public interface AuthService {
 
     UserResponse updateMe(UpdateMeRequest request);
 
-    void logout(String refreshToken);
+    String logout(String refreshToken);
 
-    void logoutAll();
+    String logoutAll();
 
     LoginResponse refreshToken(String refreshToken);
 

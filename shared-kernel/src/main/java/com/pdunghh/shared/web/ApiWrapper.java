@@ -4,6 +4,7 @@ import org.springframework.core.MethodParameter;
 import org.springframework.data.domain.Page;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageConverter;
+import org.springframework.http.converter.StringHttpMessageConverter;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
@@ -35,7 +36,8 @@ public class ApiWrapper implements ResponseBodyAdvice<Object> {
     public boolean supports(
             @NonNull MethodParameter returnType,
             @NonNull Class<? extends HttpMessageConverter<?>> converterType) {
-        return MappingJackson2HttpMessageConverter.class.isAssignableFrom(converterType);
+        return MappingJackson2HttpMessageConverter.class.isAssignableFrom(converterType)
+                || StringHttpMessageConverter.class.isAssignableFrom(converterType);
     }
 
     @Override
@@ -47,9 +49,17 @@ public class ApiWrapper implements ResponseBodyAdvice<Object> {
             @NonNull ServerHttpRequest request,
             @NonNull ServerHttpResponse response) {
 
-        // 1. Skip nếu không phải JSON hoặc body null
-        if (body == null || selectedContentType == null
-                || !MediaType.APPLICATION_JSON.isCompatibleWith(selectedContentType)) {
+        // 1. Skip nếu body null
+        if (body == null) {
+            return body;
+        }
+
+        // Bỏ qua check ContentType vì String trả về sẽ có selectedContentType =
+        // text/plain
+        // Nhưng nếu trả về File (octet-stream, pdf, etc...) thì phải skip
+        if (selectedContentType != null
+                && !MediaType.APPLICATION_JSON.isCompatibleWith(selectedContentType)
+                && !MediaType.TEXT_PLAIN.isCompatibleWith(selectedContentType)) {
             return body;
         }
 
@@ -81,6 +91,7 @@ public class ApiWrapper implements ResponseBodyAdvice<Object> {
 
         // 5. XỬ LÝ ĐẶC BIỆT CHO STRING (Tránh lỗi ClassCastException)
         if (body instanceof String) {
+            response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
             try {
                 return objectMapper.writeValueAsString(apiResponse);
             } catch (JsonProcessingException e) {

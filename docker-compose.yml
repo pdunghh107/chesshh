@@ -1,0 +1,98 @@
+version: "3.8"
+
+services:
+  # ==========================================
+  # INFRASTRUCTURE
+  # ==========================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: chesshh-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456
+      # Database mặc định sẽ được tạo là chesshh
+      POSTGRES_DB: chesshh
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Về sau nếu muốn tự động tạo thêm db "chesshh_chess" cho Chess Service
+      # Bạn có thể mount 1 file init.sql vào:
+      # - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - chesshh-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: chesshh-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - chesshh-network
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: chesshh-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672" # Cổng giao tiếp AMQP cho Spring Boot
+      - "15672:15672" # Cổng giao diện UI quản lý (truy cập localhost:15672)
+    networks:
+      - chesshh-network
+    restart: unless-stopped
+
+  # ==========================================
+  # MICROSERVICES
+  # (Shared Kernel là thư viện dùng chung nên không build thành container)
+  # ==========================================
+
+  # auth-service:
+  #   build:
+  #     context: ./auth-service
+  #     dockerfile: Dockerfile
+  #   container_name: chesshh-auth-service
+  #   ports:
+  #     - "8081:8081"
+  #   depends_on:
+  #     - postgres
+  #     - redis
+  #     - rabbitmq
+  #   environment:
+  #     # Ghi đè cấu hình để trỏ vào các container thay vì localhost
+  #     - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/chesshh
+  #     - SPRING_DATA_REDIS_HOST=redis
+  #     - SPRING_RABBITMQ_HOST=rabbitmq
+  #   networks:
+  #     - chesshh-network
+
+  # chess-service:
+  #   build:
+  #     context: ./chess-service
+  #     dockerfile: Dockerfile
+  #   container_name: chesshh-chess-service
+  #   ports:
+  #     - "8082:8082"
+  #   depends_on:
+  #     - postgres
+  #     - redis
+  #     - rabbitmq
+  #   environment:
+  #     - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/chesshh
+  #     - SPRING_DATA_REDIS_HOST=redis
+  #     - SPRING_RABBITMQ_HOST=rabbitmq
+  #   networks:
+  #     - chesshh-network
+
+networks:
+  chesshh-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
