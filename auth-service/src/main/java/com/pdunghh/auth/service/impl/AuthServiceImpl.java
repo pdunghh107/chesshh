@@ -1,5 +1,6 @@
 package com.pdunghh.auth.service.impl;
 
+import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -10,16 +11,20 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pdunghh.auth.dto.request.LoginRequest;
 import com.pdunghh.auth.dto.request.RegisterRequest;
 import com.pdunghh.auth.dto.request.UpdateMeRequest;
 import com.pdunghh.auth.dto.response.LoginResponse;
 import com.pdunghh.auth.dto.response.UserResponse;
+import com.pdunghh.auth.entity.OutboxEvent;
 import com.pdunghh.auth.entity.User;
 import com.pdunghh.auth.exception.AuthException;
+import com.pdunghh.auth.repository.OutboxEventRepository;
 import com.pdunghh.auth.repository.UserRepository;
 import com.pdunghh.auth.service.AuthService;
 import com.pdunghh.auth.service.TokenService;
+import com.pdunghh.shared.event.UserRegisteredEvent;
 import com.pdunghh.shared.security.RequestContext;
 
 import lombok.RequiredArgsConstructor;
@@ -34,6 +39,8 @@ public class AuthServiceImpl implements AuthService {
     private final TokenService tokenService;
     private final PasswordEncoder passwordEncoder;
     private final StringRedisTemplate redisTemplate;
+    private final OutboxEventRepository outboxEventRepository;
+    private final ObjectMapper objectMapper;
 
     @Value("${app.jwt.expiration-ms}")
     private long jwtExpirationMs;
@@ -47,9 +54,8 @@ public class AuthServiceImpl implements AuthService {
         log.info("Register new user: {}", request.email());
         registerValidate(request);
         User user = registerSaveToDb(request);
-        // TODO: RabbitMQ call sang Chess Service.
-        // Gửi thông báo có user mới để Chess Service cập nhật vào DB (phục vụ tính Elo)
-        // rabbitTemplate.convertAndSend("exchange", "routingKey", userCreatedEvent);
+
+        saveUserRegisteredOutboxEvent(user);
 
         return tokenService.generateLoginResponse(user);
     }
@@ -181,6 +187,32 @@ public class AuthServiceImpl implements AuthService {
         redisTemplate.opsForValue().set("blacklist:user:" + userIdStr, "revoked", refreshExpirationMs,
                 TimeUnit.MILLISECONDS);
         tokenService.revokeAllTokens(user);
+    }
+
+    private void saveUserRegisteredOutboxEvent(User user) {
+        try {
+            UserRegisteredEvent event = new UserRegisteredEvent(
+                    user.getId(),
+                    user.getUsername(),
+                    user.getEmail(),
+                    Instant.now());
+            String payload = objectMapper.writeValueAsString(event);
+
+            OutboxEvent outboxEvent = OutboxEvent.builder()
+                    .aggregateType("USER")
+                    .aggregateId(user.getId().toString())
+                    .eventType("USER_REGISTERED")
+                    .payload(payload)
+                    .status("PENDING")
+                    .retryCount(0)
+                    .build();
+
+            outboxEventRepository.save(Objects.requireNonNull(outboxEvent));
+            log.info("OutboxEvent USER_REGISTERED saved for userId: {}", user.getId());
+        } catch (Exception e) {
+            log.error("Failed to serialize and save OutboxEvent for userId: {}", user.getId(), e);
+            throw new RuntimeException("Lỗi hệ thống khi khởi tạo sự kiện tài khoản", e);
+        }
     }
 
 }
