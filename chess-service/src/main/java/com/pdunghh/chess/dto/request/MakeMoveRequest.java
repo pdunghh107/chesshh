@@ -1,4 +1,4 @@
-package com.pdunghh.chess.game.dto;
+package com.pdunghh.chess.dto.request;
 
 public record MakeMoveRequest(
         String from,        // "e2"

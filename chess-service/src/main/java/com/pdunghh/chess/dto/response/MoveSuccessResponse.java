@@ -1,4 +1,4 @@
-package com.pdunghh.chess.game.dto;
+package com.pdunghh.chess.dto.response;
 
 import java.time.Instant;
 

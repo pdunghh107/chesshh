@@ -1,12 +1,12 @@
-package com.pdunghh.chess.game.controller;
+package com.pdunghh.chess.controller;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.pdunghh.chess.game.model.GameRoomState;
-import com.pdunghh.chess.game.service.ChessGameService;
+import com.pdunghh.chess.entity.GameRoomState;
+import com.pdunghh.chess.service.ChessGameService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

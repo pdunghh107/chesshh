@@ -25,7 +25,7 @@ public class MatchmakingServiceImpl implements MatchmakingService {
     private final PlayerStatsRepository playerStatsRepository;
     private final MatchmakingRedisService matchmakingRedisService;
     private final SimpMessagingTemplate messagingTemplate;
-    private final com.pdunghh.chess.game.service.ChessGameService chessGameService;
+    private final com.pdunghh.chess.service.ChessGameService chessGameService;
 
     private static final int DEFAULT_ELO = 1200;
     private static final int INITIAL_ELO_WINDOW = 100; // Tìm trong khoảng ±100 Elo

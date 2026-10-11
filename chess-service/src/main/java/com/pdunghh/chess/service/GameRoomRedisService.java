@@ -1,8 +1,8 @@
-package com.pdunghh.chess.game.service;
+package com.pdunghh.chess.service;
 
 import java.util.Optional;
 
-import com.pdunghh.chess.game.model.GameRoomState;
+import com.pdunghh.chess.entity.GameRoomState;
 
 public interface GameRoomRedisService {
 

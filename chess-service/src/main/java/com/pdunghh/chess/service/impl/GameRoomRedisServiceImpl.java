@@ -1,4 +1,4 @@
-package com.pdunghh.chess.game.service.impl;
+package com.pdunghh.chess.service.impl;
 
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -7,8 +7,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.pdunghh.chess.game.model.GameRoomState;
-import com.pdunghh.chess.game.service.GameRoomRedisService;
+import com.pdunghh.chess.entity.GameRoomState;
+import com.pdunghh.chess.service.GameRoomRedisService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

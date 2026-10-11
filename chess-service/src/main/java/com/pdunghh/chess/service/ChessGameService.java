@@ -1,9 +1,9 @@
-package com.pdunghh.chess.game.service;
+package com.pdunghh.chess.service;
 
 import java.util.UUID;
 
-import com.pdunghh.chess.game.dto.MakeMoveRequest;
-import com.pdunghh.chess.game.model.GameRoomState;
+import com.pdunghh.chess.dto.request.MakeMoveRequest;
+import com.pdunghh.chess.entity.GameRoomState;
 
 public interface ChessGameService {
 

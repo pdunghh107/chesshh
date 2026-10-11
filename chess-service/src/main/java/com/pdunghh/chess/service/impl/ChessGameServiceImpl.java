@@ -1,4 +1,4 @@
-package com.pdunghh.chess.game.service.impl;
+package com.pdunghh.chess.service.impl;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -6,19 +6,18 @@ import java.util.UUID;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
+import com.pdunghh.chess.dto.request.MakeMoveRequest;
+import com.pdunghh.chess.dto.response.GameErrorResponse;
+import com.pdunghh.chess.dto.response.MoveSuccessResponse;
 import com.pdunghh.chess.engine.board.ChessBoard;
 import com.pdunghh.chess.engine.board.FenUtils;
 import com.pdunghh.chess.engine.model.Move;
-import com.pdunghh.chess.engine.model.PieceColor;
 import com.pdunghh.chess.engine.model.PieceType;
 import com.pdunghh.chess.engine.model.Square;
 import com.pdunghh.chess.engine.rule.ChessRuleEngine;
-import com.pdunghh.chess.game.dto.GameErrorResponse;
-import com.pdunghh.chess.game.dto.MakeMoveRequest;
-import com.pdunghh.chess.game.dto.MoveSuccessResponse;
-import com.pdunghh.chess.game.model.GameRoomState;
-import com.pdunghh.chess.game.service.ChessGameService;
-import com.pdunghh.chess.game.service.GameRoomRedisService;
+import com.pdunghh.chess.entity.GameRoomState;
+import com.pdunghh.chess.service.ChessGameService;
+import com.pdunghh.chess.service.GameRoomRedisService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

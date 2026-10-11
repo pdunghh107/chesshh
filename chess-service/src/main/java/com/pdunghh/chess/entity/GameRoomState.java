@@ -1,4 +1,4 @@
-package com.pdunghh.chess.game.model;
+package com.pdunghh.chess.entity;
 
 import java.io.Serializable;
 import java.util.UUID;

@@ -1,4 +1,4 @@
-package com.pdunghh.chess.game.controller;
+package com.pdunghh.chess.controller;
 
 import java.security.Principal;
 import java.util.UUID;
@@ -8,8 +8,8 @@ import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Controller;
 
-import com.pdunghh.chess.game.dto.MakeMoveRequest;
-import com.pdunghh.chess.game.service.ChessGameService;
+import com.pdunghh.chess.dto.request.MakeMoveRequest;
+import com.pdunghh.chess.service.ChessGameService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
