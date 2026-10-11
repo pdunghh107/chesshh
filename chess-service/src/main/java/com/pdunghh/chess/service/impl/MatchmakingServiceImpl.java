@@ -25,9 +25,11 @@ public class MatchmakingServiceImpl implements MatchmakingService {
     private final PlayerStatsRepository playerStatsRepository;
     private final MatchmakingRedisService matchmakingRedisService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final com.pdunghh.chess.game.service.ChessGameService chessGameService;
 
     private static final int DEFAULT_ELO = 1200;
     private static final int INITIAL_ELO_WINDOW = 100; // Tìm trong khoảng ±100 Elo
+    private static final long DEFAULT_GAME_TIME_MS = 10 * 60 * 1000L; // 10 phút
 
     private final Random random = new Random();
 
@@ -56,6 +58,14 @@ public class MatchmakingServiceImpl implements MatchmakingService {
 
             // 3. Tạo phòng đấu ngẫu nhiên và phân định Trắng/Đen
             MatchFoundResponse matchResponse = buildMatchResponse(userId, playerElo, opponentId, opponentElo);
+
+            // Khởi tạo Game State trên Redis để sẵn sàng nhận nước đi
+            chessGameService.createInitialGame(
+                    matchResponse.roomId(),
+                    matchResponse.whitePlayer().userId(),
+                    matchResponse.blackPlayer().userId(),
+                    DEFAULT_GAME_TIME_MS
+            );
 
             // 4. Bắn WebSocket thông báo tới cả 2 kỳ thủ
             notifyMatchFound(userId, opponentId, matchResponse);
