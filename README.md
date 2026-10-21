@@ -173,8 +173,10 @@ Chạy lệnh sau tại thư mục gốc của dự án:
 ### 7.2. Xem tài liệu:
 Sau khi lệnh thực thi thành công, mở tệp sau bằng trình duyệt web:
 ```text
-target/site/apidocs/index.html
+target/reports/apidocs/index.html
 ```
+*(Đường dẫn tuyệt đối: `d:\dung\chesshh\target\reports\apidocs\index.html`)*
+
 Tài liệu Javadoc hiển thị cấu trúc package, sơ đồ phân cấp lớp, mô tả chi tiết `@param`, `@return`, `@throws` và các lưu ý kỹ thuật.
 
 ---
