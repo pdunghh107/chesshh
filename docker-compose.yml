@@ -48,6 +48,40 @@ services:
     restart: unless-stopped
 
   # ==========================================
+  # OBSERVABILITY: PROMETHEUS & GRAFANA
+  # ==========================================
+  prometheus:
+    image: prom/prometheus:v2.53.3
+    container_name: chesshh-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - chesshh-network
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: chesshh-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./infra/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      - prometheus
+    networks:
+      - chesshh-network
+    restart: unless-stopped
+
+  # ==========================================
   # MICROSERVICES
   # (Shared Kernel là thư viện dùng chung nên không build thành container)
   # ==========================================
@@ -96,3 +130,4 @@ networks:
 volumes:
   postgres-data:
   redis-data:
+  grafana-data:

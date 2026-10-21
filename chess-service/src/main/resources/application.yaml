@@ -47,3 +47,33 @@ spring:
           max-attempts: 3
           multiplier: 2.0
           max-interval: 5000ms
+
+# ==========================================
+# OPENAPI / SWAGGER CONFIGURATION
+# ==========================================
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: method
+    display-request-duration: true
+
+# ==========================================
+# MONITORING: ACTUATOR & PROMETHEUS METRICS
+# ==========================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
+  endpoint:
+    prometheus:
+      enabled: true
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+

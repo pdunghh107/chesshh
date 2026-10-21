@@ -46,3 +46,33 @@ app:
     secret: 3eb08fe65bcca387a304ab725a3fe273641d98f39fda6b0dae2aaa53bf92d9ee
     expiration-ms: 300000 # 5 minutes
     refresh-expiration-ms: 86400000 # 24 hours
+
+# ==========================================
+# OPENAPI / SWAGGER CONFIGURATION
+# ==========================================
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: method
+    display-request-duration: true
+
+# ==========================================
+# MONITORING: ACTUATOR & PROMETHEUS METRICS
+# ==========================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
+  endpoint:
+    prometheus:
+      enabled: true
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
