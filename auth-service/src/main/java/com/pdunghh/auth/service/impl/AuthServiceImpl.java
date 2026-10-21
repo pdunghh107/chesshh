@@ -138,12 +138,6 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
-    private void checkUserActive(User user) {
-        if (!user.isActive()) {
-            throw AuthException.accountDeactivated();
-        }
-    }
-
     private User findUserByEmail(String email) {
         return userRepository.findByEmail(email).orElseThrow(AuthException::invalidCredentials);
     }
@@ -160,7 +154,7 @@ public class AuthServiceImpl implements AuthService {
 
     private void checkLoginCredentials(User user, LoginRequest request) {
         checkPasswordMatches(request.password(), user.getPasswordHash());
-        checkUserActive(user);
+        user.checkUserActive();
     }
 
     private String generateUserRegisterEventPayload(User user) throws JsonProcessingException {
@@ -169,7 +163,6 @@ public class AuthServiceImpl implements AuthService {
                 user.getUsername(),
                 user.getEmail(),
                 Instant.now());
-
         return objectMapper.writeValueAsString(event);
     }
 
@@ -182,7 +175,6 @@ public class AuthServiceImpl implements AuthService {
                 .role("USER")
                 .isActive(true)
                 .build();
-
         return userRepository.save(Objects.requireNonNull(user));
     }
 
@@ -207,7 +199,6 @@ public class AuthServiceImpl implements AuthService {
                 .status("PENDING")
                 .retryCount(0)
                 .build();
-
         outboxEventRepository.save(Objects.requireNonNull(outboxEvent));
     }
 

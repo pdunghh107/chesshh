@@ -40,11 +40,8 @@ public class TokenServiceImpl implements TokenService {
 
     @Override
     public LoginResponse buildLoginResponse(User user) {
-
         String accessToken = createAccessToken(user);
-
         String refreshTokenStr = createRefreshToken(user);
-
         return new LoginResponse(accessToken, refreshTokenStr, UserResponse.of(user));
     }
 
@@ -55,33 +52,58 @@ public class TokenServiceImpl implements TokenService {
 
     @Override
     public void revokeRefreshTokenIfPresent(String refreshToken) {
-        refreshTokenRepository.findByToken(refreshToken).ifPresent(token -> {
-            token.setRevokedAt(Instant.now());
-            refreshTokenRepository.save(token);
-        });
+        refreshTokenRepository.findByToken(refreshToken).ifPresent(this::saveRefreshTokenRevokedState);
     }
 
     @Override
     public LoginResponse refreshTokens(String refreshToken) {
-        RefreshToken tokenEntity = refreshTokenRepository.findByToken(refreshToken)
-                .orElseThrow(AuthException::invalidCredentials);
-
-        if (tokenEntity.getRevokedAt() != null || tokenEntity.getExpiresAt().isBefore(Instant.now())) {
-            throw AuthException.invalidCredentials();
-        }
-
+        RefreshToken tokenEntity = findRefreshToken(refreshToken);
         User user = tokenEntity.getUser();
-        if (!user.isActive()) {
-            throw AuthException.invalidCredentials();
-        }
-
-        // Revoke old refresh token for rotation
-        tokenEntity.setRevokedAt(Instant.now());
-        refreshTokenRepository.save(tokenEntity);
-
+        checkRefreshTokenDataValid(tokenEntity, user);
+        saveRefreshTokenRevokedState(tokenEntity);
         return buildLoginResponse(user);
     }
 
+    // [UTILS]
+
+    // [OUT EXCEPTION]
+    private RefreshToken findRefreshToken(String refreshToken) {
+        return refreshTokenRepository.findByToken(refreshToken).orElseThrow(AuthException::invalidCredentials);
+    }
+
+    private void checkRefreshTokenValid(RefreshToken token) {
+        if (token.getRevokedAt() != null || token.getExpiresAt().isBefore(Instant.now())) {
+            throw AuthException.invalidCredentials();
+        }
+    }
+
+    private void checkUserActive(User user) {
+        user.checkUserActive();
+    }
+
+    // [PRE HANDLE]
+
+    private void checkRefreshTokenDataValid(RefreshToken refreshToken, User user) {
+        checkRefreshTokenValid(refreshToken);
+        checkUserActive(user);
+    }
+
+    // [SAVE TO DB]
+    private RefreshToken saveRefreshTokenData(User user, String refreshTokenStr) {
+        RefreshToken refreshToken = RefreshToken.builder()
+                .user(user)
+                .token(refreshTokenStr)
+                .expiresAt(Instant.now().plusMillis(refreshExpirationMs))
+                .build();
+        return refreshTokenRepository.save(Objects.requireNonNull(refreshToken));
+    }
+
+    private void saveRefreshTokenRevokedState(RefreshToken refreshToken) {
+        refreshToken.setRevokedAt(Instant.now());
+        refreshTokenRepository.save(refreshToken);
+    }
+
+    // [MAIN FUNCTIONS]
     private String createAccessToken(User user) {
         return Jwts.builder()
                 .subject(user.getId().toString())
@@ -95,16 +117,9 @@ public class TokenServiceImpl implements TokenService {
 
     private String createRefreshToken(User user) {
         String refreshTokenStr = UUID.randomUUID().toString();
-
-        RefreshToken refreshToken = RefreshToken.builder()
-                .user(user)
-                .token(refreshTokenStr)
-                .expiresAt(Instant.now().plusMillis(refreshExpirationMs))
-                .build();
-
-        refreshTokenRepository.save(Objects.requireNonNull(refreshToken));
-
+        saveRefreshTokenData(user, refreshTokenStr);
         return refreshTokenStr;
     }
 
+    // [POST HANDLE, SIDE EFFECTS]
 }
