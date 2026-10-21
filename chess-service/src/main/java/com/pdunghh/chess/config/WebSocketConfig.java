@@ -2,7 +2,6 @@ package com.pdunghh.chess.config;
 
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
-import java.util.Collections;
 
 import javax.crypto.SecretKey;
 
@@ -62,6 +61,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void configureClientInboundChannel(@NonNull ChannelRegistration registration) {
         registration.interceptors(new ChannelInterceptor() {
+            @SuppressWarnings("null")
             @Override
             public Message<?> preSend(@NonNull Message<?> message, @NonNull MessageChannel channel) {
                 StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);

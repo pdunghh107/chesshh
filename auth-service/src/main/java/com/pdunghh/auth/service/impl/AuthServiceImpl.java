@@ -7,10 +7,13 @@ import java.util.concurrent.TimeUnit;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.lang.NonNull;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pdunghh.auth.dto.request.LoginRequest;
 import com.pdunghh.auth.dto.request.RegisterRequest;
@@ -51,60 +54,42 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public LoginResponse register(RegisterRequest request) {
-        log.info("Register new user: {}", request.email());
-        registerValidate(request);
-        User user = registerSaveToDb(request);
-
-        saveUserRegisteredOutboxEvent(user);
-
-        return tokenService.generateLoginResponse(user);
+        checkRegisterDataValid(request);
+        User user = saveRegisterData(request);
+        handleUserRegisteredOutboxEvent(user);
+        return tokenService.buildLoginResponse(user);
     }
 
     @Override
     @Transactional
     public LoginResponse login(LoginRequest request) {
-        log.info("Login user: {}", request.email());
-
         User user = findUserByEmail(request.email());
-        checkUserAccount(user, request);
-        return tokenService.generateLoginResponse(user);
+        checkLoginCredentials(user, request);
+        return tokenService.buildLoginResponse(user);
     }
 
     @Override
     public UserResponse getMe() {
         UUID userId = RequestContext.getUserId();
-        log.info("Get profile for user: {}", userId);
-        User user = findUserById(userId);
-        return UserResponse.fromUser(user);
+        User user = findUserById(Objects.requireNonNull(userId));
+        return UserResponse.of(user);
     }
 
     @Override
     @Transactional
     public UserResponse updateMe(UpdateMeRequest request) {
         UUID userId = RequestContext.getUserId();
-        log.info("Update profile for user: {}", userId);
-        User user = findUserById(userId);
-
-        user.setAvatarUrl(request.avatarUrl());
-        user = userRepository.save(user);
-
-        return UserResponse.fromUser(user);
+        User user = findUserById(Objects.requireNonNull(userId));
+        user = saveUpdateData(user, request);
+        return UserResponse.of(user);
     }
 
     @Override
     @Transactional
     public String logout(String refreshToken) {
         String jti = RequestContext.getJti();
-        log.info("Logout for jti: {}", jti);
-
-        if (jti != null) {
-            redisTemplate.opsForValue().set("blacklist:jti:" + jti, "revoked", jwtExpirationMs, TimeUnit.MILLISECONDS);
-        }
-
-        if (refreshToken != null && !refreshToken.isBlank()) {
-            tokenService.revokeToken(refreshToken);
-        }
-
+        writeJtiBlacklistKey(jti);
+        revokeRefreshTokenIfPresent(refreshToken);
         return "Đăng xuất thành công";
     }
 
@@ -112,41 +97,84 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public String logoutAll() {
         UUID userId = RequestContext.getUserId();
-        log.info("Logout all for user: {}", userId);
-        User user = findUserById(userId);
-
-        logoutAllUserTokens(user);
+        User user = findUserById(Objects.requireNonNull(userId));
+        revokeAllTokensByUser(user);
         return "Đăng xuất khỏi tất cả thiết bị thành công";
     }
 
     @Override
     public LoginResponse refreshToken(String refreshToken) {
-        log.info("Refresh token attempt");
         return tokenService.refreshTokens(refreshToken);
     }
 
     @Override
     @Transactional
-    public void deactivateAccount() {
+    public String deactivateAccount() {
         UUID userId = RequestContext.getUserId();
-        log.info("Deactivate account for user: {}", userId);
-        User user = findUserById(userId);
-        deactiveSaveToDb(user);
-        logoutAllUserTokens(user);
+        User user = findUserById(Objects.requireNonNull(userId));
+        saveDeactiveData(user);
+        revokeAllTokensByUser(user);
+        return "Vô hiệu hóa tài khoản thành công";
     }
 
     // [UTILS]
-    private void registerValidate(RegisterRequest request) {
-        if (userRepository.existsByEmail(request.email())) {
+
+    // [OUT EXCEPTION]
+    private void checkEmailExists(String email) {
+        if (userRepository.existsByEmail(email)) {
             throw AuthException.emailAlreadyExists();
         }
+    }
 
-        if (userRepository.existsByUsername(request.username())) {
+    private void checkUsernameExists(String username) {
+        if (userRepository.existsByUsername(username)) {
             throw AuthException.usernameAlreadyExists();
         }
     }
 
-    private User registerSaveToDb(RegisterRequest request) {
+    private void checkPasswordMatches(String password, String passwordHash) {
+        if (!passwordEncoder.matches(password, passwordHash)) {
+            throw AuthException.invalidCredentials();
+        }
+    }
+
+    private void checkUserActive(User user) {
+        if (!user.isActive()) {
+            throw AuthException.accountDeactivated();
+        }
+    }
+
+    private User findUserByEmail(String email) {
+        return userRepository.findByEmail(email).orElseThrow(AuthException::invalidCredentials);
+    }
+
+    private User findUserById(@NonNull UUID userId) {
+        return userRepository.findById(userId).orElseThrow(AuthException::userNotFound);
+    }
+
+    // [PRE HANDLE]
+    private void checkRegisterDataValid(RegisterRequest request) {
+        checkEmailExists(request.email());
+        checkUsernameExists(request.username());
+    }
+
+    private void checkLoginCredentials(User user, LoginRequest request) {
+        checkPasswordMatches(request.password(), user.getPasswordHash());
+        checkUserActive(user);
+    }
+
+    private String generateUserRegisterEventPayload(User user) throws JsonProcessingException {
+        UserRegisteredEvent event = new UserRegisteredEvent(
+                user.getId(),
+                user.getUsername(),
+                user.getEmail(),
+                Instant.now());
+
+        return objectMapper.writeValueAsString(event);
+    }
+
+    // [SAVE TO DB]
+    private User saveRegisterData(RegisterRequest request) {
         User user = User.builder()
                 .username(request.username())
                 .email(request.email())
@@ -158,58 +186,61 @@ public class AuthServiceImpl implements AuthService {
         return userRepository.save(Objects.requireNonNull(user));
     }
 
-    private User findUserByEmail(String email) {
-        return userRepository.findByEmail(email)
-                .orElseThrow(AuthException::userNotFound);
-    }
-
-    private void checkUserAccount(User user, LoginRequest request) {
-        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
-            throw AuthException.invalidCredentials();
+    private User saveUpdateData(User user, UpdateMeRequest request) {
+        if (request.avatarUrl() != null) {
+            user.setAvatarUrl(request.avatarUrl());
         }
-
-        if (!user.isActive()) {
-            throw AuthException.accountDeactivated();
-        }
+        return userRepository.save(Objects.requireNonNull(user));
     }
 
-    private User findUserById(UUID userId) {
-        return userRepository.findById(Objects.requireNonNull(userId)).orElseThrow(AuthException::userNotFound);
-    }
-
-    private void deactiveSaveToDb(User user) {
+    private void saveDeactiveData(User user) {
         user.setActive(false);
         userRepository.save(user);
     }
 
-    private void logoutAllUserTokens(User user) {
-        String userIdStr = user.getId().toString();
-        redisTemplate.opsForValue().set("blacklist:user:" + userIdStr, "revoked", refreshExpirationMs,
-                TimeUnit.MILLISECONDS);
-        tokenService.revokeAllTokens(user);
+    private void saveUserRegisterOutboxEvent(User user, String payload) {
+        OutboxEvent outboxEvent = OutboxEvent.builder()
+                .aggregateType("USER")
+                .aggregateId(user.getId().toString())
+                .eventType("USER_REGISTERED")
+                .payload(payload)
+                .status("PENDING")
+                .retryCount(0)
+                .build();
+
+        outboxEventRepository.save(Objects.requireNonNull(outboxEvent));
     }
 
-    private void saveUserRegisteredOutboxEvent(User user) {
+    // [POST HANDLE, SIDE EFFECTS]
+    private void writeUserIdBlacklistKey(String userIdStr) {
+        redisTemplate.opsForValue().set("blacklist:user:" + userIdStr, "revoked", refreshExpirationMs,
+                TimeUnit.MILLISECONDS);
+    }
+
+    private void writeJtiBlacklistKey(String jti) {
+        if (StringUtils.hasText(jti)) {
+            redisTemplate.opsForValue().set("blacklist:jti:" + jti, "revoked", jwtExpirationMs,
+                    TimeUnit.MILLISECONDS);
+        }
+    }
+
+    private void revokeAllTokensByUser(User user) {
+        writeUserIdBlacklistKey(user.getId().toString());
+        tokenService.revokeAllRefreshTokensByUser(user);
+    }
+
+    private void revokeRefreshTokenIfPresent(String refreshToken) {
+        if (StringUtils.hasText(refreshToken)) {
+            tokenService.revokeRefreshTokenIfPresent(refreshToken);
+        }
+    }
+
+    private void handleUserRegisteredOutboxEvent(User user) {
         try {
-            UserRegisteredEvent event = new UserRegisteredEvent(
-                    user.getId(),
-                    user.getUsername(),
-                    user.getEmail(),
-                    Instant.now());
-            String payload = objectMapper.writeValueAsString(event);
-
-            OutboxEvent outboxEvent = OutboxEvent.builder()
-                    .aggregateType("USER")
-                    .aggregateId(user.getId().toString())
-                    .eventType("USER_REGISTERED")
-                    .payload(payload)
-                    .status("PENDING")
-                    .retryCount(0)
-                    .build();
-
-            outboxEventRepository.save(Objects.requireNonNull(outboxEvent));
-            log.info("OutboxEvent USER_REGISTERED saved for userId: {}", user.getId());
+            String payload = generateUserRegisterEventPayload(user);
+            saveUserRegisterOutboxEvent(user, payload);
         } catch (Exception e) {
+            // TODO : JSON Processing Exceptional handler
             log.error("Failed to serialize and save OutboxEvent for userId: {}", user.getId(), e);
             throw new RuntimeException("Lỗi hệ thống khi khởi tạo sự kiện tài khoản", e);
         }

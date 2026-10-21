@@ -48,7 +48,7 @@ public class RedisTokenServiceImpl implements RedisTokenService {
         String accessToken = createAccessToken(user);
         String refreshTokenStr = createAndSaveRefreshToken(user);
 
-        return new LoginResponse(accessToken, refreshTokenStr, UserResponse.fromUser(user));
+        return new LoginResponse(accessToken, refreshTokenStr, UserResponse.of(user));
     }
 
     @Override

@@ -97,8 +97,10 @@ public class ChessGameServiceImpl implements ChessGameService {
 
         // 2. Edge Case 3: Out-of-order Moves (Ply sequence check)
         if (request.expectedPly() != state.getPlyCount() + 1) {
-            log.warn("Out-of-order move rejected! expectedPly: {}, serverPly: {}", request.expectedPly(), state.getPlyCount());
-            sendError(roomId, userId, "Nước đi không đồng bộ với thế cờ hiện tại. Đang khôi phục lại bàn cờ...", state.getFen(), state.getPlyCount());
+            log.warn("Out-of-order move rejected! expectedPly: {}, serverPly: {}", request.expectedPly(),
+                    state.getPlyCount());
+            sendError(roomId, userId, "Nước đi không đồng bộ với thế cờ hiện tại. Đang khôi phục lại bàn cờ...",
+                    state.getFen(), state.getPlyCount());
             return;
         }
 
@@ -162,11 +164,11 @@ public class ChessGameServiceImpl implements ChessGameService {
                 state.getWhiteTimeRemainingMs(),
                 state.getBlackTimeRemainingMs(),
                 state.getStatus(),
-                Instant.now()
-        );
+                Instant.now());
 
         messagingTemplate.convertAndSend("/topic/game/" + roomId + "/move", response);
-        log.info("Successfully processed move for roomId: {}, from: {} to: {}, new turn: {}", roomId, request.from(), request.to(), state.getTurn());
+        log.info("Successfully processed move for roomId: {}, from: {} to: {}, new turn: {}", roomId, request.from(),
+                request.to(), state.getTurn());
     }
 
     private void handleTimeoutWin(GameRoomState state, String status, String message) {

@@ -11,8 +11,12 @@ public record UserResponse(
                 String role,
                 String avatarUrl) {
 
-        public static UserResponse fromUser(User user) {
-                return new UserResponse(user.getId(), user.getUsername(), user.getEmail(), user.getRole(),
+        public static UserResponse of(User user) {
+                return new UserResponse(
+                                user.getId(),
+                                user.getUsername(),
+                                user.getEmail(),
+                                user.getRole(),
                                 user.getAvatarUrl());
         }
 

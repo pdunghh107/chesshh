@@ -4,11 +4,11 @@ import com.pdunghh.auth.dto.response.LoginResponse;
 import com.pdunghh.auth.entity.User;
 
 public interface TokenService {
-    LoginResponse generateLoginResponse(User user);
+    LoginResponse buildLoginResponse(User user);
 
-    void revokeAllTokens(User user);
-    
-    void revokeToken(String refreshToken);
-    
+    void revokeAllRefreshTokensByUser(User user);
+
+    void revokeRefreshTokenIfPresent(String refreshToken);
+
     LoginResponse refreshTokens(String refreshToken);
 }

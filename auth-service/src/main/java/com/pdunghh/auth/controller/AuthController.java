@@ -2,6 +2,9 @@ package com.pdunghh.auth.controller;
 
 import java.util.Objects;
 
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
+
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.web.bind.annotation.CookieValue;
@@ -21,8 +24,6 @@ import com.pdunghh.auth.dto.response.UserResponse;
 import com.pdunghh.auth.exception.AuthException;
 import com.pdunghh.auth.service.AuthService;
 
-import jakarta.servlet.http.HttpServletResponse;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -81,9 +82,10 @@ public class AuthController {
     }
 
     @DeleteMapping("/me/deactivate")
-    public String deactivateAccount() {
-        authService.deactivateAccount();
-        return "Vô hiệu hóa tài khoản thành công";
+    public String deactivateAccount(HttpServletResponse response) {
+        String message = authService.deactivateAccount();
+        clearRefreshTokenCookie(response);
+        return message;
     }
 
     private void setRefreshTokenCookie(HttpServletResponse response, String refreshToken) {

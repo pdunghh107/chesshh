@@ -21,5 +21,5 @@ public interface AuthService {
 
     LoginResponse refreshToken(String refreshToken);
 
-    void deactivateAccount();
+    String deactivateAccount();
 }

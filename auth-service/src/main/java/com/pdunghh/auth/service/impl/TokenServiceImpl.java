@@ -39,22 +39,22 @@ public class TokenServiceImpl implements TokenService {
     private long refreshExpirationMs;
 
     @Override
-    public LoginResponse generateLoginResponse(User user) {
+    public LoginResponse buildLoginResponse(User user) {
 
         String accessToken = createAccessToken(user);
 
         String refreshTokenStr = createRefreshToken(user);
 
-        return new LoginResponse(accessToken, refreshTokenStr, UserResponse.fromUser(user));
+        return new LoginResponse(accessToken, refreshTokenStr, UserResponse.of(user));
     }
 
     @Override
-    public void revokeAllTokens(User user) {
-        refreshTokenRepository.revokeAllUserTokens(user, Instant.now());
+    public void revokeAllRefreshTokensByUser(User user) {
+        refreshTokenRepository.revokeAllRefreshTokensByUser(user, Instant.now());
     }
 
     @Override
-    public void revokeToken(String refreshToken) {
+    public void revokeRefreshTokenIfPresent(String refreshToken) {
         refreshTokenRepository.findByToken(refreshToken).ifPresent(token -> {
             token.setRevokedAt(Instant.now());
             refreshTokenRepository.save(token);
@@ -79,7 +79,7 @@ public class TokenServiceImpl implements TokenService {
         tokenEntity.setRevokedAt(Instant.now());
         refreshTokenRepository.save(tokenEntity);
 
-        return generateLoginResponse(user);
+        return buildLoginResponse(user);
     }
 
     private String createAccessToken(User user) {

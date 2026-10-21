@@ -74,7 +74,7 @@ public class AuthV2ServiceImpl implements AuthV2Service {
         UUID userId = RequestContext.getUserId();
         log.info("[V2] Get profile for user: {}", userId);
         User user = findUserById(userId);
-        return UserResponse.fromUser(user);
+        return UserResponse.of(user);
     }
 
     @Override
@@ -87,7 +87,7 @@ public class AuthV2ServiceImpl implements AuthV2Service {
         user.setAvatarUrl(request.avatarUrl());
         user = userRepository.save(user);
 
-        return UserResponse.fromUser(user);
+        return UserResponse.of(user);
     }
 
     @Override
