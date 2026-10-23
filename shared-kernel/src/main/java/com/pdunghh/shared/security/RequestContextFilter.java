@@ -40,6 +40,12 @@ public class RequestContextFilter extends OncePerRequestFilter {
     private StringRedisTemplate redisTemplate;
 
     @Override
+    protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
+        // Luôn bỏ qua các request OPTIONS (Preflight) để CORS Filter và trình duyệt handshake trơn tru
+        return "OPTIONS".equalsIgnoreCase(request.getMethod());
+    }
+
+    @Override
     protected void doFilterInternal(
             @NonNull HttpServletRequest request,
             @NonNull HttpServletResponse response,
